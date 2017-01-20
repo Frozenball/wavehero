@@ -80,10 +80,11 @@ function updateDisplay() {
     point.match = false;
   }
 
+  // Calculate matches first
   for(var x=0; x <= this.canvas.width; x += 1) {
     var value = 0;
     for (let sin of this.sines) {
-      value += sin.A * Math.sin(sin.w * (x /*+ time * 0.25*/) + sin.o);
+      value += sin.A * Math.sin(sin.w * x + sin.o);
     }
     var y = 180.0 - value * 120;
 
@@ -91,19 +92,32 @@ function updateDisplay() {
       var d = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
       if (d <= 10) {
         point.match = true;
-        if ((Date.now() - point.lastMatch) >= 10) {
-          this.particles.push({
-            x: x + Math.random() * 5,
-            y: y + Math.random() * 5,
-            speedY: 0,
-            time: 0
-          })
-        }
-
         point.lastMatch = Date.now();
       }
     }
+  }
 
+  // Draw
+  for(var x=0; x <= this.canvas.width; x += 1) {
+    var value = 0;
+    for (let sin of this.sines) {
+      value += sin.A * Math.sin(sin.w * x + sin.o);
+    }
+
+    var closestDistance = (() => {
+      var closestDistance = 10000;
+      for (let point of this.points) {
+        if (point.match) {
+          closestDistance = Math.min(closestDistance, Math.abs(x - point.x));
+        }
+      }
+      return closestDistance;
+    })();
+    if (closestDistance <= 100) {
+      value += 0.05 * Math.sin(x*0.5) * (1 - closestDistance/100) * Math.sin(time*0.03);
+    }
+
+    var y = 180.0 - value * 120;
     this.ctx.lineTo(x,y);
   }
   this.ctx.stroke();
@@ -124,6 +138,22 @@ function updateDisplay() {
   //   this.ctx.arc(particle.x, particle.y, 4, 0, 2 * Math.PI, true);
   //   this.ctx.stroke();  
   // }
+  // Draw point lines
+  // this.ctx.beginPath();
+  // this.ctx.strokeStyle = '#f39c12';
+  // let i = 0;
+  // for (let point of this.points) {
+  //   if (point.match) {
+  //     if (i === 0) {
+  //       this.ctx.moveTo(point.x, point.y);
+  //     } else {
+  //       this.ctx.lineTo(point.x, point.y);
+  //     }
+  //     i++;
+  //   }
+  // }
+  // this.ctx.stroke();
+
   // Draw points
   for (let point of this.points) {
     this.ctx.strokeStyle = '#f39c12';
@@ -133,12 +163,15 @@ function updateDisplay() {
     var r = 10;
 
     this.ctx.beginPath();
-    this.ctx.arc(point.x, point.y, r, 0, 2 * Math.PI, true);
-    this.ctx.stroke();  
 
     if (point.match) {
+      this.ctx.arc(point.x, point.y + 3*Math.sin((time + x*342.12345)*0.02 + x*163.12345), r, 0, 2 * Math.PI, true);
+      this.ctx.stroke();  
       this.ctx.fillStyle = '#f39c12';
       this.ctx.fill();
+    } else {
+      this.ctx.arc(point.x, point.y, r, 0, 2 * Math.PI, true);
+      this.ctx.stroke();  
     }
   }
 
@@ -180,7 +213,7 @@ export default {
       alive: true,
       score: 0,
       particles: [],
-      points: generatePoints(),
+      points: generatePoints(30),
       sines: [{
         A: 1,
         w: 0.02,
