@@ -1,18 +1,29 @@
 <template>
   <div class="hello">
+    <img id="bg1" src="static/bg1.png" style="display: none;">
+    <img id="bg2" src="static/bg2.png" style="display: none;">
+    <img id="bg3" src="static/bg3.png" style="display: none;">
+    <img id="bg4" src="static/bg4.png" style="display: none;">
+    <img id="bg5" src="static/bg5.png" style="display: none;">
     <canvas id="megaCanvas" width="800" height="400"></canvas>
     <div>
-      <a class="btn" href="#" v-bind:class="{win: win}" v-on:click.prevent="backToMenu()">Back to menu</a>
+      <a class="btn" href="#" v-bind:class="{win: win}" v-on:click.prevent="backToMenu()"><i class="fa fa-bars" aria-hidden="true"></i> Levels</a>
+      <a class="btn" href="#" v-on:click.prevent="toggleSound()">
+        <i v-if="root.sound" class="fa fa-volume-up" aria-hidden="true"></i>
+        <i v-if="!root.sound" class="fa fa-volume-off" aria-hidden="true"></i>
+        <span v-if="root.sound">Sound on</span>
+        <span v-if="!root.sound">Sound off</span>
+      </a>
     </div>
     <div>
       <h4>Waves</h4>
       <p class="help-text" v-if="!sines.length">Start by adding a wave</p>
 
-      <p class="help-text" v-if="sines.length > 0 && selectedWave !== null">Use <span class="key">↑</span><span class="key">↓</span> to control amplitude, <span class="key">←</span><span class="key">→</span> to move the wave and <span class="key">a</span><span class="key">s</span> to control frequency. Use <span class="key">&#x21E7;</span> for precision.</p>
+      <p class="help-text" v-if="sines.length > 0 && selectedWave !== null">Use <span class="key">↑</span><span class="key">↓</span> to control amplitude, <span class="key">←</span><span class="key">→</span> to move the wave and <span class="key">a</span><span class="key">s</span> to control frequency. Use <span class="key">&#x21E7;</span> for precision. Create new wave with <span class="key">n</span> and remove current one with <span class="key">r</span>. Switch between waves with <span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key">4</span><span class="key">5</span>.</p>
 
       <p class="help-text" v-if="sines.length > 0 && selectedWave === null">Select wave using <span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key">4</span><span class="key">5</span>.</p>
       <div v-on:click.prevent="selectWave(index)" class="wave" v-bind:class="{ active: selectedWave == index}" v-for="(sin, index) in sines">
-        <wave v-bind:A="sin.A" v-bind:w="sin.w" v-bind:o="sin.o"></wave>
+        <wave v-bind:points="points" v-bind:A="sin.A" v-bind:w="sin.w" v-bind:o="sin.o"></wave>
         <!-- {{ sin.A }} * sin({{sin.w}}*w + {{ sin.o }})<br> -->
 <!-- 
         <strong>Strength:</strong>
@@ -35,6 +46,7 @@ import events from '../events';
 import pickRandom from 'pick-random';
 import mousetrap from 'mousetrap';
 import levels from '../levels';
+import root from '../root';
 import Wave from './Wave';
 
 const SOUND_COIN1 = new Audio('static/coin.wav');
@@ -48,9 +60,11 @@ const DANGER_POINT_DISTANCE = 15;
 const HOW_CLOSE_DANGER = 30;
 
 function playCoin() {
+  if (!root.sound) return;
   [SOUND_COIN1, SOUND_COIN2, SOUND_COIN3][_.random(0, 2)].play();
 }
 function playHurt() {
+  if (!root.sound) return;
   [SOUND_HURT1, SOUND_HURT2, SOUND_HURT3][_.random(0, 2)].play();
 }
 
@@ -153,6 +167,11 @@ function updateDisplay() {
   // this.ctx.fillStyle = 'white';
   // this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
   this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+  // this.ctx.globalAlpha = 0.1;
+  // let img = document.getElementById('bg' + (this.level % 5 + 1));
+  // this.ctx.drawImage(img, 0, 0, 800, 400);
+  // this.ctx.globalAlpha = 1;
 
   this.ctx.strokeStyle = '#2c3e50';
   this.ctx.lineWidth = 2;
@@ -352,6 +371,9 @@ export default {
     Wave
   },
   methods: {
+    toggleSound() {
+      this.root.sound = !this.root.sound;
+    },
     backToMenu() {
       events.$emit('menu');
     },
@@ -389,30 +411,34 @@ export default {
       }
 
       function bindBoth(key, callback) {
-        mousetrap.bind(key, e => callback(1));
-        mousetrap.bind('shift+'+key, e => callback(0.1));
+        mousetrap.bind(key, e => callback(1, e));
+        mousetrap.bind('shift+'+key, e => callback(0.1, e));
       }
 
-      bindBoth('left', accuracy => {
+      bindBoth('left', (accuracy, e) => {
         var wave = this.sines[this.selectedWave];
+        e.preventDefault();
         if (wave) {
           wave.o += 0.1 * accuracy;
         }
       });
-      bindBoth('right', accuracy => {
+      bindBoth('right', (accuracy, e) => {
         var wave = this.sines[this.selectedWave];
+        e.preventDefault();
         if (wave) {
           wave.o -= 0.1 * accuracy;
         }
       });
-      bindBoth('up', accuracy => {
+      bindBoth('up', (accuracy, e) => {
         var wave = this.sines[this.selectedWave];
+        e.preventDefault();
         if (wave) {
           wave.A += 0.05 * accuracy;
         }
       });
-      bindBoth('down', accuracy => {
+      bindBoth('down', (accuracy, e) => {
         var wave = this.sines[this.selectedWave];
+        e.preventDefault();
         if (wave) {
           wave.A -= 0.05 * accuracy;
         }
@@ -454,7 +480,8 @@ export default {
         o: 0
       }],
       selectedWave: 0,
-      win: false
+      win: false,
+      root
     }
   },
   watch: {

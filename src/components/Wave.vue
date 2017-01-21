@@ -5,9 +5,13 @@
 </template>
 
 <script>
+const POINT_DISTANCE = 20;
+const DANGER_POINT_DISTANCE = 15;
+const HOW_CLOSE_DANGER = 30;
+
 export default {
   name: 'hello',
-  props: ['A', 'w', 'o'],
+  props: ['A', 'w', 'o', 'points'],
   methods: {
     draw() {
       this.canvas = this.$el.querySelector('.waveCanvas');
@@ -16,6 +20,14 @@ export default {
       const scale = 200/800;
 
       this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.strokeStyle = '#bdc3c7';
+      
+      for (let point of this.points) {
+        this.ctx.beginPath();
+        this.ctx.arc(point.x * scale, point.y * scale, point.danger ? scale * 0.5 * DANGER_POINT_DISTANCE : scale * 0.5 * POINT_DISTANCE, 0, 2 * Math.PI, true);
+        this.ctx.stroke();  
+      }
+
       this.ctx.strokeStyle = '#2c3e50';
       this.ctx.moveTo(0,180);
       this.ctx.beginPath();

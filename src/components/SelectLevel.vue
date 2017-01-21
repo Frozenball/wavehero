@@ -26,9 +26,9 @@ export default {
   },
   methods: {
     selectLevel(i) {
-      /*if (i > this.playable) {
+      if (i > this.playable) {
         return;
-      }*/
+      }
       // console.log('selectLevel', i);
       events.$emit('selectLevel', i);
     }
