@@ -5,6 +5,7 @@
     <canvas id="megaCanvas" width="800" height="400"></canvas>
     <div>
       <a class="btn" href="#" v-bind:class="{win: win}" v-on:click.prevent="backToMenu()"><i class="fa fa-bars" aria-hidden="true"></i> Levels</a>
+      <a class="btn win" href="#" v-if="win" v-on:click.prevent="nextLevel()">Next level</a>
       <a class="btn" href="#" v-on:click.prevent="toggleSound()">
         <i v-if="root.sound" class="fa fa-volume-up" aria-hidden="true"></i>
         <i v-if="!root.sound" class="fa fa-volume-off" aria-hidden="true"></i>
@@ -370,11 +371,23 @@ export default {
     Wave
   },
   methods: {
+    init() {
+      [ this.points, this.winSines ] = levels[this.level];
+      this.win = false;
+      this.sines = [{
+        A: 0.05,
+        w: 0.02,
+        o: 0
+      }];
+    },
     toggleSound() {
       this.root.sound = !this.root.sound;
     },
     backToMenu() {
       events.$emit('menu');
+    },
+    nextLevel() {
+      events.$emit('selectLevel', this.level + 1);
     },
     selectWave(index) {
       if (this.selectedWave === index) {
@@ -495,14 +508,14 @@ export default {
         winLevels[this.level] = true;
         window.localStorage['winLevels'] = JSON.stringify(winLevels);
       }
+    },
+    level() {
+      this.init();
     }
   },
   mounted() {
-    console.log('MOUNT');
-    [ this.points, this.winSines ] = levels[this.level];
     //[ this.points, this.winSines ] = generatePoints(this.level + 1, Math.round((this.level + 2)*0.33), 1 + Math.round((1 + this.level) * 0.33));
-
-    //[ this.points, this.winSines ] = generatePoints(this.level + 1, 5, 5 + Math.round((1 + this.level) * 0.5));
+    this.init();
     this.time = Date.now();
     this.canvas = document.getElementById('megaCanvas');
     this.ctx = this.canvas.getContext('2d');
