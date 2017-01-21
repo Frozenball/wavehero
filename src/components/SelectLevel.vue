@@ -12,6 +12,7 @@ export default {
   name: 'select-level',
   computed: {
     playable() {
+      if (Object.keys(this.winLevels).length === 0) return 1;
       return Object.keys(this.winLevels).length + 3;
     }
   },

@@ -1,10 +1,7 @@
 <template>
   <div class="hello">
-    <img id="bg1" src="static/bg1.png" style="display: none;">
-    <img id="bg2" src="static/bg2.png" style="display: none;">
-    <img id="bg3" src="static/bg3.png" style="display: none;">
-    <img id="bg4" src="static/bg4.png" style="display: none;">
-    <img id="bg5" src="static/bg5.png" style="display: none;">
+    <popup v-if="level === 1" text="Your goal is to match all green circles with sin waves at the same time."></popup>
+    <popup v-if="level === 2" text="Don't match any red circles"></popup>
     <canvas id="megaCanvas" width="800" height="400"></canvas>
     <div>
       <a class="btn" href="#" v-bind:class="{win: win}" v-on:click.prevent="backToMenu()"><i class="fa fa-bars" aria-hidden="true"></i> Levels</a>
@@ -48,6 +45,7 @@ import mousetrap from 'mousetrap';
 import levels from '../levels';
 import root from '../root';
 import Wave from './Wave';
+import Popup from './Popup';
 
 const SOUND_COIN1 = new Audio('static/coin.wav');
 const SOUND_COIN2 = new Audio('static/coin2.wav');
@@ -368,6 +366,7 @@ export default {
   name: 'play',
   props: ['level'],
   components: {
+    Popup,
     Wave
   },
   methods: {
@@ -525,6 +524,7 @@ export default {
 .hello {
   width: 800px;
   margin: 0px auto;
+  position: relative;
 }
 h1, h2 {
   font-weight: normal;
