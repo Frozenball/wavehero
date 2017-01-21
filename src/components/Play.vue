@@ -8,7 +8,7 @@
       <h4>Waves</h4>
       <p class="help-text" v-if="!sines.length">Start by adding a wave</p>
 
-      <p class="help-text" v-if="sines.length > 0 && selectedWave !== null">Use <span class="key">↑</span><span class="key">↓</span> to control amplitude, <span class="key">←</span><span class="key">→</span> to move the wave and <span class="key">a</span><span class="key">s</span> to control wave count.</p>
+      <p class="help-text" v-if="sines.length > 0 && selectedWave !== null">Use <span class="key">↑</span><span class="key">↓</span> to control amplitude, <span class="key">←</span><span class="key">→</span> to move the wave and <span class="key">a</span><span class="key">s</span> to control frequency. Use <span class="key">&#x21E7;</span> for precision.</p>
 
       <p class="help-text" v-if="sines.length > 0 && selectedWave === null">Select wave using <span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key">4</span><span class="key">5</span>.</p>
       <div v-on:click.prevent="selectWave(index)" class="wave" v-bind:class="{ active: selectedWave == index}" v-for="(sin, index) in sines">
@@ -34,19 +34,53 @@ import _ from 'lodash';
 import events from '../events';
 import pickRandom from 'pick-random';
 import mousetrap from 'mousetrap';
+import levels from '../levels';
 import Wave from './Wave';
 
+const SOUND_COIN1 = new Audio('static/coin.wav');
+const SOUND_COIN2 = new Audio('static/coin2.wav');
+const SOUND_COIN3 = new Audio('static/coin3.wav');
+const SOUND_HURT1 = new Audio('static/hurt.wav');
+const SOUND_HURT2 = new Audio('static/hurt2.wav');
+const SOUND_HURT3 = new Audio('static/hurt3.wav');
 const POINT_DISTANCE = 20;
+const DANGER_POINT_DISTANCE = 15;
+const HOW_CLOSE_DANGER = 30;
+
+function playCoin() {
+  [SOUND_COIN1, SOUND_COIN2, SOUND_COIN3][_.random(0, 2)].play();
+}
+function playHurt() {
+  [SOUND_HURT1, SOUND_HURT2, SOUND_HURT3][_.random(0, 2)].play();
+}
 
 function generatePoints(pointCount=6, sinCount=7, dangerCount=2) {
   var sines = [];
   for (var k=0; k <= sinCount; k++) {
     sines.push({
-        A: pickRandom([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]),
-        w: pickRandom([0.005, 0.01, 0.02, 0.03]),
+        A: _.random(0.1, 2),
+        w: _.random(0.005, 0.2),//pickRandom([0.005, 0.01, 0.02, 0.03]),
         o: _.random(0, 100),
     });
   }
+
+  // Cap points
+  let maxAmplitude = 0;
+  for(var x=0; x <= 800; x += 1) {
+    var value = 0;
+    for (let sin of sines) {
+      value += sin.A * Math.sin(sin.w * (x) + sin.o);
+    }
+    var y = 200 - value * 120;
+    maxAmplitude = Math.max(maxAmplitude, Math.abs(value * 120));
+  }
+
+  if (maxAmplitude > 180) {
+    for (let sin of sines) {
+      sin.A *= 180 / maxAmplitude;
+    }
+  }
+
   var potentialPoints = [];
 
   for(var x=0; x <= 800; x += 1) {
@@ -54,10 +88,10 @@ function generatePoints(pointCount=6, sinCount=7, dangerCount=2) {
     for (let sin of sines) {
       value += sin.A * Math.sin(sin.w * (x) + sin.o);
     }
-    var y = 180.0 - value * 120;
+    var y = 200 - value * 120;
     potentialPoints.push({
-      x: Math.round(x),
-      y: Math.round(y),
+      x: Math.round(x + _.random(-POINT_DISTANCE/2, POINT_DISTANCE/2)),
+      y: Math.round(y + _.random(-POINT_DISTANCE/2, POINT_DISTANCE/2)),
       lastMatch: 0,
       match: false,
       danger: false
@@ -66,8 +100,8 @@ function generatePoints(pointCount=6, sinCount=7, dangerCount=2) {
 
   var output = [];
 
-  for (var x=50; x < 50+Math.round(700/pointCount)*pointCount; x += Math.round(700/pointCount)) {
-    output.push(potentialPoints[x]);
+  for (let x of _.range(pointCount).map(v => (1 + v) * 800/(pointCount+1))) {
+    output.push(potentialPoints[Math.round(x)]);
   }
 
   var dangerPoints = [];
@@ -75,21 +109,32 @@ function generatePoints(pointCount=6, sinCount=7, dangerCount=2) {
     let x = _.random(50, 750);
     let y = _.random(50, 350);
 
-    var value = 0;
-    for (let sin of sines) {
-      value += sin.A * Math.sin(sin.w * (x) + sin.o);
-    }
-    var pointY = 180.0 - value * 120;
-    if (Math.abs(pointY - y) <= 40) {
+    
+    var matches = (function() {
+      for (let pointX=x-HOW_CLOSE_DANGER/2; pointX<=x+HOW_CLOSE_DANGER/2; pointX++) {
+        let value = 0;
+        for (let sin of sines) {
+          value += sin.A * Math.sin(sin.w * pointX + sin.o);
+        }
+        var pointY = 200 - value * 120;
+        var distance = Math.sqrt(Math.pow(pointX - x, 2) + Math.pow(pointY - y, 2))
+        if (distance <= HOW_CLOSE_DANGER) {
+          return true;
+        }
+      }
+      return false;
+    })();
+
+    if (matches) {
       continue;
     }
 
     dangerPoints.push({
       x,
       y,
-      lastMatch: 0,
       match: false,
-      danger: true
+      danger: true,
+      playedSound: false
     });
   }
 
@@ -105,9 +150,9 @@ function updateDisplay() {
   }
 
   const time = Date.now() - this.time;
-  this.ctx.fillStyle = 'white';
-  this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-  // this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  // this.ctx.fillStyle = 'white';
+  // this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+  this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
   this.ctx.strokeStyle = '#2c3e50';
   this.ctx.lineWidth = 2;
@@ -124,14 +169,28 @@ function updateDisplay() {
     for (let sin of this.sines) {
       value += sin.A * Math.sin(sin.w * x + sin.o);
     }
-    var y = 180.0 - value * 120;
+    var y = 200 - value * 120;
 
     for (let point of this.points) {
       var d = Math.sqrt(Math.pow(x - point.x, 2) + Math.pow(y - point.y, 2));
-      if (d <= POINT_DISTANCE) {
+      if (d <= (point.danger ? DANGER_POINT_DISTANCE : POINT_DISTANCE)) {
         point.match = true;
-        point.lastMatch = Date.now();
+
+        if (!point.playedSound) {
+          if (point.danger) {
+            playHurt();
+          } else {
+            playCoin();
+          }
+          point.playedSound = true;
+        }
       }
+    }
+  }
+
+  for (let point of this.points) {
+    if (!point.match && point.playedSound) {
+      point.playedSound = false;
     }
   }
 
@@ -147,7 +206,7 @@ function updateDisplay() {
         value += sin.A * Math.sin(sin.w * x + sin.o);
       }
 
-      var y = 180.0 - value * 120;
+      var y = 200 - value * 120;
       this.ctx.lineTo(x,y);
     }
     this.ctx.stroke();
@@ -168,7 +227,7 @@ function updateDisplay() {
   //     i += 1;
   //   }
 
-  //   var y = 180.0 - value * 120;
+  //   var y = 200 - value * 120;
   //   this.ctx.lineTo(x,y);
   // }
   // this.ctx.stroke();
@@ -197,7 +256,7 @@ function updateDisplay() {
       value += 0.05 * Math.sin(x*0.5) * (1 - closestDistance/100) * Math.sin(time*0.03);
     }
 
-    var y = 180.0 - value * 120;
+    var y = 200 - value * 120;
     this.ctx.lineTo(x,y);
   }
   this.ctx.stroke();
@@ -254,7 +313,7 @@ function updateDisplay() {
     if (point.match) {
 
       if (point.danger) {
-        this.ctx.arc(point.x, point.y, POINT_DISTANCE, 0, 2 * Math.PI, true);
+        this.ctx.arc(point.x, point.y, DANGER_POINT_DISTANCE, 0, 2 * Math.PI, true);
       } else {
         this.ctx.arc(point.x, point.y + 3*Math.sin((time + x*342.12345)*0.02 + x*163.12345), POINT_DISTANCE, 0, 2 * Math.PI, true);
       }
@@ -268,7 +327,7 @@ function updateDisplay() {
       }
       this.ctx.fill();
     } else {
-      this.ctx.arc(point.x, point.y, POINT_DISTANCE, 0, 2 * Math.PI, true);
+      this.ctx.arc(point.x, point.y, point.danger ? DANGER_POINT_DISTANCE : POINT_DISTANCE, 0, 2 * Math.PI, true);
       this.ctx.stroke();  
     }
   }
@@ -328,40 +387,57 @@ export default {
           this.selectedWave = k-1;
         });
       }
-      mousetrap.bind('left', e => {
+
+      function bindBoth(key, callback) {
+        mousetrap.bind(key, e => callback(1));
+        mousetrap.bind('shift+'+key, e => callback(0.1));
+      }
+
+      bindBoth('left', accuracy => {
         var wave = this.sines[this.selectedWave];
         if (wave) {
-          wave.o += 0.1;
+          wave.o += 0.1 * accuracy;
         }
       });
-      mousetrap.bind('right', e => {
+      bindBoth('right', accuracy => {
         var wave = this.sines[this.selectedWave];
         if (wave) {
-          wave.o -= 0.1;
+          wave.o -= 0.1 * accuracy;
         }
       });
-      mousetrap.bind('up', e => {
+      bindBoth('up', accuracy => {
         var wave = this.sines[this.selectedWave];
         if (wave) {
-          wave.A += 0.05;
+          wave.A += 0.05 * accuracy;
         }
       });
-      mousetrap.bind('down', e => {
+      bindBoth('down', accuracy => {
         var wave = this.sines[this.selectedWave];
         if (wave) {
-          wave.A -= 0.05;
+          wave.A -= 0.05 * accuracy;
         }
       });
-      mousetrap.bind('a', e => {
+      bindBoth('a', accuracy => {
         var wave = this.sines[this.selectedWave];
         if (wave) {
-          wave.w -= 0.00025;
+          wave.w -= 0.00025 * accuracy * Math.abs(wave.w) / 0.02;
+          wave.w = Math.max(-0.8, Math.min(0.8, wave.w));
         }
       });
-      mousetrap.bind('s', e => {
+      bindBoth('s', accuracy => {
         var wave = this.sines[this.selectedWave];
         if (wave) {
-          wave.w += 0.00025;
+          wave.w += 0.00025 * accuracy * Math.abs(wave.w) / 0.02;
+          wave.w = Math.max(-0.8, Math.min(0.8, wave.w));
+        }
+      });
+      mousetrap.bind('n', e => {
+        this.addWave();
+      });
+      mousetrap.bind('r', e => {
+        if (this.selectedWave !== null) {
+          this.removeWave(this.sines[this.selectedWave]);
+          this.selectedWave = Math.min(this.selectedWave, this.sines.length-1);
         }
       });
     }
@@ -372,11 +448,11 @@ export default {
       score: 0,
       particles: [],
       points: [],
-      sines: [/*{
-        A: 1,
+      sines: [{
+        A: 0.05,
         w: 0.02,
         o: 0
-      }*/],
+      }],
       selectedWave: 0,
       win: false
     }
@@ -397,10 +473,16 @@ export default {
   },
   mounted() {
     console.log('MOUNT');
-    [ this.points, this.winSines ] = generatePoints(this.level, Math.round((this.level + 2)*0.33), 2 + Math.round(this.level * 0.5));
+    [ this.points, this.winSines ] = levels[this.level];
+    //[ this.points, this.winSines ] = generatePoints(this.level + 1, Math.round((this.level + 2)*0.33), 1 + Math.round((1 + this.level) * 0.33));
+
+    //[ this.points, this.winSines ] = generatePoints(this.level + 1, 5, 5 + Math.round((1 + this.level) * 0.5));
     this.time = Date.now();
     this.canvas = document.getElementById('megaCanvas');
     this.ctx = this.canvas.getContext('2d');
+    window.save = () => {
+      console.log(JSON.stringify([this.points, this.winSines]));
+    };
     
     updateDisplay.bind(this)();
     this.bindKeys();

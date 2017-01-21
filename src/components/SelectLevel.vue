@@ -1,5 +1,6 @@
 <template>
   <div class="select-level">
+    <h3>Select level</h3>
     <a href="#" v-for="i in levels" v-on:click.prevent="selectLevel(i)" v-bind:class="{ win: winLevels[i], locked: i > playable}">{{ i }}</a>
   </div>
 </template>
@@ -11,12 +12,12 @@ export default {
   name: 'select-level',
   computed: {
     playable() {
-      return Object.keys(this.winLevels).length + 2;
+      return Object.keys(this.winLevels).length + 3;
     }
   },
   data() {
     return {
-      levels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      levels: _.range(1,20+1),//[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
       winLevels: {}
     };
   },
@@ -25,9 +26,9 @@ export default {
   },
   methods: {
     selectLevel(i) {
-      if (i > this.playable) {
+      /*if (i > this.playable) {
         return;
-      }
+      }*/
       // console.log('selectLevel', i);
       events.$emit('selectLevel', i);
     }
